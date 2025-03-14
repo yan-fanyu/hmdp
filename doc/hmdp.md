@@ -64,3 +64,10 @@ private User createUserWithPhone(String phone) {
 
 }
 ```
+
+# 登录校验
+![img.png](img.png)
+
+
+# redis 代替 tomcat 中的 session
+![img_1.png](img_1.png)
