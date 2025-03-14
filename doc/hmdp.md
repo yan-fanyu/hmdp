@@ -71,3 +71,13 @@ private User createUserWithPhone(String phone) {
 
 # redis 代替 tomcat 中的 session
 ![img_1.png](img_1.png)
+
+
+![img_2.png](img_2.png)
+
+# 缓存更新策略
+![img_3.png](img_3.png)
+
+![img_4.png](img_4.png)
+
+![img_5.png](img_5.png)

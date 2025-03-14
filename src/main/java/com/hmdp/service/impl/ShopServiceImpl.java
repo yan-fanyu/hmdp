@@ -1,10 +1,23 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
+import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import javax.print.ServiceUI;
+
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
+import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
 
 /**
  * <p>
@@ -16,5 +29,49 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
+    @Override
+    public Result queryById(Long id) {
+        String key = CACHE_SHOP_KEY + id;
+        // 1 从 redis 查询商铺缓存
+        String shopJson = stringRedisTemplate.opsForValue().get("cache:shop:" + id);
+        // 2 判断 redis 是否存在
+        if (StrUtil.isNotBlank(shopJson)) {
+            // 3 redis 中存在
+            Shop shop = JSONUtil.toBean(shopJson, Shop.class);
+            return Result.ok(shop);
+        }
+        // 4 不存在 根据 id 查询数据库
+        Shop shop = getById(id);
+        // 5 不存在 返回错误
+        if(shop == null){
+            return Result.fail("店铺不存在");
+        }
+        //  6 存在 写入 redis
+        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        // 7 返回
+        return null;
+    }
+
+    @Override
+    @Transactional
+    public Result update(Shop shop) {
+        Long id = shop.getId();
+        if(id == null){
+            return Result.fail("店铺id不能为空");
+        }
+        // 1 更新数据库
+        updateById(shop);
+        // 2 删除缓存
+        stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
+
+        return Result.ok();
+    }
 }
+
+
+
+
+

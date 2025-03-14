@@ -30,8 +30,8 @@ public class MvcConfig implements WebMvcConfigurer {
         // token 刷新拦截器
         // 拦截所有请求
         // order 值 越小，优先级越高
-        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
-                .addPathPatterns("/**")
-                .order(0);
+//        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
+//                .addPathPatterns("/**")
+//                .order(0);
     }
 }
