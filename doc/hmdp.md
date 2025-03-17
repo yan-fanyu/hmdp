@@ -559,3 +559,11 @@ class HmDianPingApplicationTests {
 
 # 超卖问题
 ![img_22.png](img_22.png)
+悲观锁和乐观锁
+![img_23.png](img_23.png)
+
+悲观锁效率较低，此处不使用
+
+乐观锁
+两种方式
+![img_24.png](img_24.png)
