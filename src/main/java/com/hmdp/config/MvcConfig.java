@@ -1,7 +1,10 @@
 package com.hmdp.config;
 
+
 import com.hmdp.utils.LoginInterceptor;
 import com.hmdp.utils.RefreshTokenInterceptor;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
+import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -9,6 +12,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import javax.annotation.Resource;
 
+/**
+ * mvc配置
+ *
+ * @author CHEN
+ * @date 2022/10/07
+ */
 @Configuration
 public class MvcConfig implements WebMvcConfigurer {
     @Resource
@@ -16,22 +25,22 @@ public class MvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 登录拦截器
-        registry.addInterceptor(new LoginInterceptor())
-                .excludePathPatterns(
-                        "/shop/**",
-                        "/voucher/**",
-                        "/shop-type/**",
-                        "/upload/**",
-                        "/blog/hot",
-                        "/user/code",
-                        "/user/login"
-                ).order(1);
-        // token 刷新拦截器
-        // 拦截所有请求
-        // order 值 越小，优先级越高
-//        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
-//                .addPathPatterns("/**")
-//                .order(0);
+        //登陆拦截器
+        registry
+                .addInterceptor(new LoginInterceptor())
+                .excludePathPatterns("/user/code"
+                        , "/user/login"
+                        , "/blog/hot"
+                        , "/shop/**"
+                        , "/shop-type/**"
+                        , "/upload/**"
+                        , "/voucher/**"
+                )
+                .order(1);
+        //Token续命拦截器
+        registry
+                .addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
+                .addPathPatterns("/**")
+                .order(0);
     }
 }

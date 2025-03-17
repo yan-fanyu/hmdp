@@ -440,3 +440,122 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 }
 ```
+
+
+# 第三章 秒杀优惠券
+## ID 唯一性
+![img_18.png](img_18.png)
+
+![img_19.png](img_19.png)
+
+生成唯一 ID 的代码
+```java
+
+package com.hmdp.utils;
+
+
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+
+@Component
+public class RedisIdWorker {
+
+    private static final long BEGIN_TIMESTAMP = 1640995200L;
+    private static final int COUNT_BITS = 32;
+
+    private StringRedisTemplate stringRedisTemplate;
+
+    public RedisIdWorker(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
+
+    // 1 bit 符号  +  31 bit 时间戳  +  32 bit 序列号
+    public long nextId(String keyPrefix){
+        // 1 生成时间戳
+        LocalDateTime now = LocalDateTime.now();
+        long nowSecond = now.toEpochSecond(ZoneOffset.UTC);
+        long timestamp = nowSecond - BEGIN_TIMESTAMP;
+
+        // 2 生成序列号
+        // 2.1 获取当前日期 精确到天
+        String date = now.format(DateTimeFormatter.ofPattern("yyyy:MM:dd"));
+        // 2.2 自增长
+        long count = stringRedisTemplate.opsForValue().increment("icr:" + keyPrefix + ":" + date);
+
+
+        // 3 拼接并返回
+        return timestamp << 32 | count;
+    }
+
+    public static void main(String[] args) {
+        LocalDateTime time = LocalDateTime.of(2022, 1, 1, 0, 0, 0);
+        long second = time.toEpochSecond(ZoneOffset.UTC);
+        System.out.println("second = " + second);
+    }
+
+}
+
+```
+测试类代码
+```java
+package com.hmdp;
+
+import com.hmdp.entity.Shop;
+import com.hmdp.service.impl.ShopServiceImpl;
+import com.hmdp.utils.CacheClient;
+import com.hmdp.utils.RedisIdWorker;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import javax.annotation.Resource;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
+
+@SpringBootTest
+class HmDianPingApplicationTests {
+
+    @Resource
+    RedisIdWorker redisIdWorker;
+
+    private ExecutorService es = Executors.newFixedThreadPool(500);
+
+    @Test
+    void testIdWorker() throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(300);
+
+        Runnable task = () -> {
+            for (int i = 0; i < 100; i++) {
+                long id = redisIdWorker.nextId("order");
+                System.out.println("id = " + id);
+            }
+            latch.countDown();
+        };
+        long begin = System.currentTimeMillis();
+        for (int i = 0; i < 300; i++) {
+            es.submit(task);
+        }
+        latch.await();
+        long end = System.currentTimeMillis();
+        System.out.println("time = " + (end - begin));
+    }
+
+
+}
+
+```
+
+![img_20.png](img_20.png)
+
+# 添加优惠券
+![img_21.png](img_21.png)
+
+# 超卖问题
+![img_22.png](img_22.png)
