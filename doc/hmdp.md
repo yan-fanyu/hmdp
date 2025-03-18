@@ -637,7 +637,79 @@ class HmDianPingApplicationTests {
 - 导入依赖
 
 ```json
-
+<dependency>
+    <groupId>org.redisson</groupId>
+    <artifactId>redisson</artifactId>
+    <version>3.13.6</version>
+</dependency>
 ```
 
 - 配置 Redisson 客户端
+```java
+package com.hmdp.config;
+
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RedissonConfig {
+    @Bean
+    public RedissonClient redissonClient(){
+        // 配置
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://127.0.0.1:6379");
+
+        // 创建 RedissonClient 对象
+        return Redisson.create(config);
+    }
+
+}
+
+```
+更新 voucherOrderServiceImp
+```java
+@Override
+public Result seckillVoucher(Long voucherId) {
+    // 1 查询优惠券
+    SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+    // 2 判断秒杀是否开始
+    if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
+        return Result.fail("秒杀尚未开始");
+    }
+    // 3 判断秒杀是否已经结束
+    if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
+        return Result.fail("秒杀已经结束");
+    }
+    // 4 判断库存是否充足
+    if (voucher.getStock() < 1) {
+        return Result.fail("库存不足");
+    }
+    Long userId = UserHolder.getUser().getId();
+
+    // 创建锁对象
+    //SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+    RLock lock = redissonClient.getLock("lock:order:" + userId);
+    // 获取锁
+    boolean isLock = lock.tryLock();
+    if(!isLock){
+        // 获取锁失败 返回错误或者重试
+        return Result.fail("不允许重复下单");
+    }try {
+        // 获取代理对象（事务）
+        IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+        return proxy.createVoucherOrder(voucherId);
+    }finally {
+        // 释放锁
+        lock.unlock();
+    }
+
+}
+```
+
+# Redisson 可重入锁的原理
+```redis
+SET lock thread1 NX EX 100
+```
