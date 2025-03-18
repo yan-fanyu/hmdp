@@ -567,3 +567,77 @@ class HmDianPingApplicationTests {
 乐观锁
 两种方式
 ![img_24.png](img_24.png)
+
+# 一人一单
+![img_25.png](img_25.png)
+
+插入优惠券
+![img_26.png](img_26.png)
+```json
+{
+    "shopId" : 1,
+    "title" : "100元代金券",
+    "subTitle": "周一至周五均可使用",
+    "rules": "全场通用\\n无需预约\\n可无限叠加\\不兑现、不找零\\n仅限堂食",
+    "payValue" : 8000,
+    "actualValue" : 1000,
+    "type": 1,
+    "stock" : 100,
+    "beginTime": "2025-03-01T12:30:00",
+    "endTime":   "2025-03-31T14:30:00"
+}
+
+```
+
+![img_27.png](img_27.png)
+
+# 分布式锁
+解决方法
+多个 JVM 使用同一个锁监视器
+![img_29.png](img_29.png)
+![img_30.png](img_30.png)
+
+# 分布式锁的实现 对比分析
+![img_31.png](img_31.png)
+
+
+# redis 实现
+![img_32.png](img_32.png)
+
+![img_33.png](img_33.png)
+
+# 基于 Redis 的分布式锁
+问题
+拿到锁的进程由于各种原因，执行时间过长，以至于 锁的 TTL 超时，则当前进程未执行结束
+其他线程就乘虚而入，当其他线程还在执行时，第一个线程完成了，又释放了别人的锁 \
+有很大的问题
+![img_34.png](img_34.png)
+
+解决方案如下图
+在获取锁的时候，存入自己的标识
+在释放锁的时候判断是否是自己的锁
+![img_35.png](img_35.png)
+
+
+问题
+使用UUID可能存在问题，因为两个 JVM 之间的ID 是独立的，可能重复
+
+# 新的问题
+解决方法，保证两个动作的原子性\
+使用 Lua 脚本
+![img_36.png](img_36.png)
+
+语法
+![img_37.png](img_37.png)
+
+# redisson 功能介绍
+![img_38.png](img_38.png)
+
+入门
+- 导入依赖
+
+```json
+
+```
+
+- 配置 Redisson 客户端
