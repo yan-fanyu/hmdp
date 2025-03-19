@@ -713,3 +713,133 @@ public Result seckillVoucher(Long voucherId) {
 ```redis
 SET lock thread1 NX EX 100
 ```
+
+
+
+# 秒杀
+
+把两个阶段抽取出来，分给两个独立的线程去操作
+![img_39.png](img_39.png)
+
+![img_40.png](img_40.png)
+
+1 首先判断库存是否充足       剩余的优惠券数量 缓存到 redis
+2 判断是否一人一单          缓存所有的购买用户到 redis  使用 set 集合 实现
+
+上面两个操作必须保证原子性
+使用 Lua 脚本实现原子性
+
+![img_41.png](img_41.png)
+
+## 需求分析
+实现需求一
+```java
+// 保存秒杀库存到 Redis
+stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
+```
+第二步 编写 lua 脚本
+```lua
+--1 参数列表
+--1.1 优惠券id
+local voucherId = ARGV[1]
+--1.2 用户id
+local userID = ARGV[2]
+
+
+--2 数据key
+--2.1 库存key
+local stockKey = 'seckill:stock:' .. voucherId
+--2.2 订单key
+local orderKey = 'seckill:order' .. voucherId
+
+-- 3 脚本业务
+-- 3.1 判断库存是否充足
+if(tonumber(redis.call('get', stockKey)) <= 0) then
+    -- 3.2 库存不足 返回1
+    return 1
+end
+
+
+-- 3.2 判断用户是否已经下过单
+if(redis.call('sismenber', orderKey, userID) == 1) then
+    -- 3.3 存在 说明是重复下单 返回2
+    return 2
+end
+
+-- 3.4 扣库存 stockKey + (-1)
+redis.call('incrby', stockKey, -1)
+-- 3.5 下单 保存用户
+redis.call('sadd', orderKey, userID)
+```
+
+
+在 redis 上实现了数量和订单缓存
+![img_42.png](img_42.png)
+
+```java
+@Override
+public Result seckillVoucher(Long voucherId) {
+    // 获取用户
+    Long userId = UserHolder.getUser().getId();
+    // 1 执行 lua 脚本
+    Long result = stringRedisTemplate.execute(
+            SECKILL_SCRIPT,
+            Collections.emptyList(),
+            voucherId.toString(), userId.toString()
+    );
+    // 判断结果是否是 0
+    int r = result.intValue();
+    if(r != 0){
+        // 不是0 代表没有购买资格
+        return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+    }
+    // 2.2 为 0 有购买资格  把下单信息保存到阻塞队列
+    long orderId = redisIdWorker.nextId("order");
+    return Result.ok(orderId);
+}
+```
+
+以上完成了业务 第一第二 阶段
+
+第三阶段 抢单
+```java
+@Override
+public Result seckillVoucher(Long voucherId) {
+    // 获取用户
+    Long userId = UserHolder.getUser().getId();
+    // 1 执行 lua 脚本
+    Long result = stringRedisTemplate.execute(
+            SECKILL_SCRIPT,
+            Collections.emptyList(),
+            voucherId.toString(), userId.toString()
+    );
+    // 判断结果是否是 0
+    int r = result.intValue();
+    if(r != 0){
+        // 不是0 代表没有购买资格
+        return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+    }
+    // 2.2 为 0 有购买资格  把下单信息保存到阻塞队列
+    VoucherOrder voucherOrder = new VoucherOrder();
+    // 订单 id
+    long orderId = redisIdWorker.nextId("order");
+    voucherOrder.setId(orderId);
+    // 用户 id
+    voucherOrder.setUserId(userId);
+    // 代金券id
+    voucherOrder.setVoucherId(voucherId);
+    // 放入阻塞队列
+    orderTask.add(voucherOrder);
+
+
+    // 返回订单 id
+    return Result.ok(orderId);
+}
+```
+
+
+秒杀优化基本完成
+![img_43.png](img_43.png)
+问题 \
+使用 JVM 内存
+数据安全和不一致的问题
