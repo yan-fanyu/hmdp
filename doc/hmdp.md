@@ -843,3 +843,173 @@ public Result seckillVoucher(Long voucherId) {
 问题 \
 使用 JVM 内存
 数据安全和不一致的问题
+
+# 1 Redis 基于 List 的消息队列
+1 生产者 对 1 消费者
+# 2 基于 PubSub 的消息队列  发布订阅模式
+1 生产者 对 n 消费者
+![img_44.png](img_44.png)
+
+![img_45.png](img_45.png)
+
+# 3 Redis 基于 Stream 的单消费者模式
+```redis
+XREAD COUNT 1 BLOCK 1000 STREAMS users $
+```
+
+# 4 Redis 基于 Stream 的 消费者组
+![img_46.png](img_46.png)
+创建消费者组
+```redis
+XGROUP CREATE 队列名称 消费者组名称 ID [MKSTREAM]
+```
+
+![img_47.png](img_47.png)
+
+
+上面四种总结
+![img_48.png](img_48.png)
+
+
+# 实例
+
+基于 Redis 的 Stream 结构作为消息对了 实现异步秒杀下单
+![img_49.png](img_49.png)
+
+
+修改 lua 脚本
+```lua
+--1 参数列表
+--1.1 优惠券id
+local voucherId = ARGV[1]
+--1.2 用户id
+local userID = ARGV[2]
+--1.3 订单id
+local orderID = ARGV[3]
+
+
+--2 数据key
+--2.1 库存key
+local stockKey = 'seckill:stock:' .. voucherId
+--2.2 订单key
+local orderKey = 'seckill:order:' .. voucherId
+
+-- 3 脚本业务
+-- 3.1 判断库存是否充足
+if(tonumber(redis.call('get', stockKey)) <= 0) then
+    -- 3.2 库存不足 返回1
+    return 1
+end
+
+
+-- 3.2 判断用户是否已经下过单
+if(redis.call('sismember', orderKey, userID) == 1) then
+    -- 3.3 存在 说明是重复下单 返回2
+    return 2
+end
+
+-- 3.4 扣库存 stockKey + (-1)
+redis.call('incrby', stockKey, -1)
+-- 3.5 下单 保存用户
+redis.call('sadd', orderKey, userID)
+-- 3.6 发送消息到队列中
+redis.call('xadd', 'streams.orders', '*', 'userId', userID, 'voucherId', voucherId, 'id', orderID)
+return 0
+
+
+
+```
+
+1 改造 方法
+```java
+@Override
+public Result seckillVoucher(Long voucherId) {
+    // 获取用户
+    Long userId = UserHolder.getUser().getId();
+    // 1 执行 lua 脚本
+    Long result = stringRedisTemplate.execute(
+            SECKILL_SCRIPT,
+            Collections.emptyList(),
+            voucherId.toString(), userId.toString()
+    );
+    // 判断结果是否是 0
+    int r = result.intValue();
+    if(r != 0){
+        // 不是0 代表没有购买资格
+        return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+    }
+    // 2.2 为 0 有购买资格  把下单信息保存到阻塞队列
+    VoucherOrder voucherOrder = new VoucherOrder();
+    // 订单 id
+    long orderId = redisIdWorker.nextId("order");
+    voucherOrder.setId(orderId);
+    // 用户 id
+    voucherOrder.setUserId(userId);
+    // 代金券id
+    voucherOrder.setVoucherId(voucherId);
+    // 放入阻塞队列
+    orderTask.add(voucherOrder);
+
+    // 3 获取代理对象
+    proxy = (IVoucherOrderService) AopContext.currentProxy();
+
+
+    // 返回订单 id
+    return Result.ok(orderId);
+}
+```
+改为下面的
+```java
+@Override
+public Result seckillVoucher(Long voucherId) {
+    // 1 获取用户
+    Long userId = UserHolder.getUser().getId();
+    // 2 订单 id
+    long orderId = redisIdWorker.nextId("order");
+    // 3 执行 lua 脚本
+    Long result = stringRedisTemplate.execute(
+            SECKILL_SCRIPT,
+            Collections.emptyList(),
+            voucherId.toString(), userId.toString(), String.valueOf(orderId)
+    );
+    // 2 判断结果是否是 0
+    int r = result.intValue();
+    if(r != 0){
+        // 不是0 代表没有购买资格
+        return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+    }
+    // 3 获取代理对象
+    proxy = (IVoucherOrderService) AopContext.currentProxy();
+    // 4 返回订单 id
+    return Result.ok(orderId);
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
