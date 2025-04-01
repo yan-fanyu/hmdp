@@ -37,6 +37,7 @@ public class BlogController {
 
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
+        // 修改点赞数量
         return blogService.likeBlog(id);
     }
 
@@ -58,30 +59,25 @@ public class BlogController {
     }
 
     @GetMapping("/{id}")
-    public Result queryBlogById(@PathVariable("id") Long id){
+    public Result queryBlogById(@PathVariable("id") Long id) {
         return blogService.queryBlogById(id);
     }
-
     @GetMapping("/likes/{id}")
-    public Result queryBlogLikes(@PathVariable("id") Long id){
-        return blogService.queryBlogLikes(id);
+    public Result queryBlogLikesById(@PathVariable("id") Long id) {
+        return blogService.queryBlogLikesById(id);
     }
 
-    // BlogController
     @GetMapping("/of/user")
-    public Result queryBlogByUserId(
-            @RequestParam(value = "current", defaultValue = "1") Integer current,
-            @RequestParam("id") Long id) {
-        // 根据用户查询
-        Page<Blog> page = blogService.query()
-                .eq("user_id", id).page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
-        // 获取当前页数据
+    public Result queryBlogByUserId(@RequestParam(value = "current",defaultValue = "1")Integer current,
+                                    @RequestParam("id")Long id){
+        Page<Blog> page = blogService.query().eq("user_id", id)
+                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+
         List<Blog> records = page.getRecords();
         return Result.ok(records);
     }
-
-    public Result queryBlogOfFollow(
-            @RequestParam("lastId") Long max, @RequestParam(value = "offset", defaultValue = "0") Integer offset){
-        return blogService.queryBlogOfFollow(max, offset);
+    @GetMapping("/of/follow")
+    public Result queryBlogOfFollow(@RequestParam("lastId")Long max,@RequestParam(value = "offset",defaultValue = "0")Integer offset){
+        return blogService.queryBlogOfFollow(max,offset);
     }
 }
