@@ -37,7 +37,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         , "/voucher/**"
                 )
                 .order(1);
-        //Token续命拦截器
+        // Token续命拦截器
         registry
                 .addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
                 .addPathPatterns("/**")

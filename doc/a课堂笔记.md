@@ -1209,13 +1209,43 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
 
 # 好友关注
+## 关注和取关
+请求参数
+![img_52.png](img_52.png)
+需求分析
+![img_54.png](img_54.png)
+
+
+## 共同关注
+请求分析
+![img_55.png](img_55.png)
+需求分析
+![img_56.png](img_56.png)
+## 关注推送
 
 
 
 
+![img_57.png](img_57.png)
+三种模式：
+读扩散：
+用户读取的时候才会拉取大收件箱，再进行排序
+![img_58.png](img_58.png)
+写扩散
+直接发给每一个粉丝
+![img_59.png](img_59.png)
+读写混合
+活跃用户、普通用户、僵尸用户
+![img_60.png](img_60.png)
+
+对比
+![img_61.png](img_61.png)
 
 
+需求分析：
+![img_62.png](img_62.png)
 
+Feed流不能使用普通的分页查询、只能使用滚动分页查询
 
 
 

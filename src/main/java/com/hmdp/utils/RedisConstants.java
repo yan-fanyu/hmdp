@@ -2,7 +2,8 @@ package com.hmdp.utils;
 
 public class RedisConstants {
     public static final String LOGIN_CODE_KEY = "login:code:";
-    public static final Long LOGIN_CODE_TTL = 2L;
+    // todo 为了学习方便，改为了 12 小时
+    public static final Long LOGIN_CODE_TTL = 12L;
     public static final String LOGIN_USER_KEY = "login:token:";
     public static final Long LOGIN_USER_TTL = 30L;
 
