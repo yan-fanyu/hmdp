@@ -138,6 +138,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 2 创建锁对象
         RLock lock = redissonClient.getLock("lock:order:" + userId);
         // 3 获取锁
+        // 使用无参方法 失败直接返回
         boolean isLock = lock.tryLock();
         // 4 判断锁是否成功
         if(!isLock){
