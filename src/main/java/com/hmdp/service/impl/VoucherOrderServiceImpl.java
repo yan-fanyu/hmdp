@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.hmdp.dto.Result;
+import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +101,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         private void handelPendingList() {
             while (true) {
                 try {
-                    // 1 获取订单中的信息
                     List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
                             Consumer.from("g1", "c1"),
                             StreamReadOptions.empty().count(1),
@@ -156,6 +157,38 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         SECKILL_SCRIPT = new DefaultRedisScript<>();
         SECKILL_SCRIPT.setLocation(new ClassPathResource("seckill.lua"));
         SECKILL_SCRIPT.setResultType(Long.class);
+    }
+
+    // CAS 实现秒杀
+    @Override
+    public Result seckillVoucherCAS(Long voucherId) {
+        // 1 获取优惠券
+        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+        // 2 判断秒杀是否开始
+        if(voucher.getBeginTime().isAfter(LocalDateTime.now())){
+            return Result.fail("秒杀尚未开始");
+        }
+        // 3 判断秒杀是否结束
+        if(voucher.getEndTime().isBefore(LocalDateTime.now())){
+            return Result.fail("秒杀已经结束");
+        }
+        // 4 判断库存是否充足
+        if (voucher.getStock() < 1) {
+            return Result.fail("库存不足");
+        }
+        // 5 扣减库存
+        boolean success = seckillVoucherService.update()
+                .setSql("stock = stock - 1")
+                .eq("voucher_id", voucherId)
+                .ge("stock", 0)
+                .update();
+        if(!success){
+            return Result.fail("库存不足");
+        }
+        // 6 创建订单
+
+
+        return Result.ok();
     }
 
     @Override

@@ -25,3 +25,18 @@ mybatis-plus:
 logging:
   level:
     com.hmdp: debug
+
+
+bloomFilter:
+  # 是否启用布隆过滤器
+  bloomFilterFlag: true
+  # 布隆过滤器的初始大小
+  MIN_EXPECTED_INSERTIONS: 8
+  # 布隆过滤器的错误率
+  bloomFilterErrorRate: 0.01
+  # 布隆过滤器的最大使用率
+  maximumUtilization: 0.90
+  # 布隆过滤器的最小使用率
+  minimumUtilization: 0.40
+  # 布隆过滤器的初始序列号
+  RBloomFilterSequence: 1

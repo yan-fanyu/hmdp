@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.bloomfilter.BloomFilter;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
@@ -51,6 +52,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
         // 互斥锁解决缓存击穿
         // Shop shop = queryWithMutex(id);
+
+
 
         // 逻辑过期解决缓存击穿问题
         Shop shop = cacheClient.

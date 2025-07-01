@@ -4,10 +4,8 @@ import cn.hutool.core.lang.UUID;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.data.redis.core.script.RedisScript;
 
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
@@ -32,10 +30,10 @@ public class SimpleRedisLock implements ILock{
     @Override
     public boolean tryLock(long timeoutSec) {
         // 获取线程表示
-        String threadId = ID_PREFIX + Thread.currentThread().getId();
+        long id = Thread.currentThread().getId();
         // 获取锁
-        Boolean success = stringRedisTemplate.opsForValue()
-                .setIfAbsent(KEY_PREFIX + name, threadId, timeoutSec, TimeUnit.SECONDS);
+        Boolean success = stringRedisTemplate.opsForValue().
+                setIfAbsent(KEY_PREFIX + name, id + "", timeoutSec, TimeUnit.SECONDS);
         // 防止空指针
         return Boolean.TRUE.equals(success);
     }
@@ -48,6 +46,22 @@ public class SimpleRedisLock implements ILock{
                 Collections.singletonList(KEY_PREFIX + name),
                 ID_PREFIX + Thread.currentThread().getId());
     }
+
+    @Override
+    public void unlockLua() {
+
+    }
+
+//    @Override
+//    public void unlockLua() {
+//        // 调用 lua 脚本
+//        stringRedisTemplate.execute(
+//                UNLOCK_SCRIPT,
+//                Collections.singletonList(KEY_PREFIX + name),
+//                ID_PREFIX + Thread.currentThread().getId());
+//    }
+
+
 
 //    @Override
 //    public void unlock() {
