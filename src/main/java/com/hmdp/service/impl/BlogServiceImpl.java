@@ -73,25 +73,24 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Override
     public Result likeBlog(Long id) {
-        //获取当前登陆用户
+        // 获取当前登陆用户
         Long userId = UserHolder.getUser().getId();
-        //判断当前用户时候点赞
+        // 判断当前用户时候点赞
         String key = RedisConstants.BLOG_LIKED_KEY + id;
-        Double score = stringRedisTemplate.opsForZSet().score(key,userId.toString());
-        if (score==null) {
+        Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
+        if (score == null) {
             //如果未点赞 可以点赞
-            //写数据库
-            boolean isSuccess = update().setSql("liked=liked+1").eq("id", id).update();
+            boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
             //保存数据到redis
             if (isSuccess){
                 stringRedisTemplate.opsForZSet().add(key,userId.toString(),System.currentTimeMillis());
             }
         } else {
             //如果已经点赞 取消点赞
-            boolean isSuccess = update().setSql("liked=liked-1").eq("id", id).update();
+            boolean isSuccess = update().setSql("liked = liked-1").eq("id", id).update();
             //数据库-1
             if (isSuccess){
-                stringRedisTemplate.opsForZSet().remove(key,userId.toString());
+                stringRedisTemplate.opsForZSet().remove(key, userId.toString());
             }
             //redis删除数据
         }
@@ -99,18 +98,66 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     }
 
 
+    public Result likeBlogSortYan(Long id) {
+        // 获取当前登陆用户
+        Long userId = UserHolder.getUser().getId();
+        // 判断当前用户时候点赞
+        String key = RedisConstants.BLOG_LIKED_KEY + id;
+        Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
+        if (score == null) {
+            //如果未点赞 可以点赞
+            boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
+            //保存数据到redis
+            if (isSuccess){
+                stringRedisTemplate.opsForZSet().add(key,userId.toString(),System.currentTimeMillis());
+            }
+        } else {
+            //如果已经点赞 取消点赞
+            boolean isSuccess = update().setSql("liked = liked-1").eq("id", id).update();
+            //数据库-1
+            if (isSuccess){
+                stringRedisTemplate.opsForZSet().remove(key, userId.toString());
+            }
+            //redis删除数据
+        }
+        return Result.ok();
+    }
+
+
+    public Result likeBlogYan(Long id) {
+        Long userId = UserHolder.getUser().getId();
+        String key = RedisConstants.BLOG_LIKED_KEY + id;
+        Boolean isMember = stringRedisTemplate.opsForSet().isMember(key, userId);
+        if(BooleanUtil.isFalse(isMember)){
+            boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
+            if(isSuccess) {
+                stringRedisTemplate.opsForSet().add(key, String.valueOf(userId));
+            }
+        }else{
+            boolean isSuccess = update().setSql("liked = liked - 1").eq("id", id).update();
+            if(isSuccess) {
+                stringRedisTemplate.opsForSet().remove(key, userId.toString());
+            }
+        }
+        return Result.ok();
+    }
+
+
+
+    // 查询排行榜 top5
     @Override
     public Result queryBlogLikesById(Long id) {
         String key = RedisConstants.BLOG_LIKED_KEY + id;
         //查询top5的点赞用户
-        Set<String> top5 = stringRedisTemplate.opsForZSet().range(key, 0, 6);
-        if (top5==null||top5.isEmpty()){
+        Set<String> top5 = stringRedisTemplate.opsForZSet().range(key, 0, 4);
+        if (top5 == null || top5.isEmpty()){
             return Result.ok(Collections.emptyList());
         }
-        //解析出用户id
+        // 2、解析出用户id
         List<Long> userIds = top5.stream().map(Long::valueOf).collect(Collectors.toList());
-        String join = StrUtil.join(",", userIds);
-        //根据id查询用户
+        // 写出 SQL 语句
+        String join = StrUtil.join(",", userIds);       //  "5, 1, 4"
+        //根据id查询用户  where id in (5, 1, 4) order by filed(id, 5, 1, 4)
         List<UserDTO> userDTOS = userService.lambdaQuery()
                 .in(User::getId,userIds)
                 .last("order by field(id,"+join+")")
@@ -198,14 +245,14 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private void isBlogLiked(Blog blog) {
         //获取当前登陆用户
         UserDTO user = UserHolder.getUser();
-        if (user==null){
+        if (user == null){
             return;
         }
         Long userId = user.getId();
-        //判断当前用户时候点赞
+        // 判断当前用户是否点赞
         String key = RedisConstants.BLOG_LIKED_KEY + blog.getId();
         Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
-        blog.setIsLike(score!=null);
+        blog.setIsLike(score != null);
     }
 
 }

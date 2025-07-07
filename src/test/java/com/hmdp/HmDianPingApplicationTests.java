@@ -75,4 +75,9 @@ class HmDianPingApplicationTests {
 
     }
 
+    @Test
+    public void testHyperLogLog(){
+        stringRedisTemplate.opsForHyperLogLog().add("uv", "1");
+    }
+
 }

@@ -16,4 +16,34 @@ key     0x1231231     6
 
 redisson 实际上底层代码 就是 用 lua 脚本实现的
 
-#
+# hyperloglog 实现 UV 访客数量
+```redis
+PFADD uv e1 e2 e3
+
+PFCOUNT uv
+```
+
+
+# 实现点赞
+```java
+public Result likeBlogYan(Long id) {
+    Long userId = UserHolder.getUser().getId();
+    String key = RedisConstants.BLOG_LIKED_KEY + id;
+    Boolean isMember = stringRedisTemplate.opsForSet().isMember(key, userId);
+    if(BooleanUtil.isFalse(isMember)){
+        boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
+        if(isSuccess) {
+            stringRedisTemplate.opsForSet().add(key, String.valueOf(userId));
+        }
+    }else{
+        boolean isSuccess = update().setSql("liked = liked - 1").eq("id", id).update();
+        if(isSuccess) {
+            stringRedisTemplate.opsForSet().remove(key, userId.toString());
+        }
+    }
+    return Result.ok();
+}
+```
+
+# 点赞排行榜
+
