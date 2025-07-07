@@ -122,6 +122,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         int dayOfMonth = now.getDayOfMonth();
         //写了redis
         stringRedisTemplate.opsForValue().setBit(key,dayOfMonth-1,true);
+        // 读取数据
+        String s = stringRedisTemplate.opsForValue().get(key);
+        System.out.println(s);
         return Result.ok();
     }
 
@@ -144,19 +147,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                                 .unsigned(dayOfMonth))
                         .valueAt(0)
         );
-        if (result==null||result.isEmpty()){
+        if (result==null || result.isEmpty()){
             return Result.ok(0);
         }
         Long num = result.get(0);
-        if (num==null||num==0){
+        if (num == null || num == 0){
             return Result.ok(0);
         }
         //转二进制字符串
         String binaryString = Long.toBinaryString(num);
+        System.out.println(binaryString);
         //计算连续签到天数
         int count=0;
         for (int i = binaryString.length()-1; i >=0; i--) {
-            if (binaryString.charAt(i)=='1'){
+            if (binaryString.charAt(i) == '1'){
                 count++;
             }
             else {

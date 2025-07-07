@@ -101,6 +101,7 @@ public class UserController {
 
     @PostMapping("/sign")
     public Result sign(){
+        System.out.println("sign");
         return userService.sign();
     }
 
