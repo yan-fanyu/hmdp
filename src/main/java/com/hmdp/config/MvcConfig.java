@@ -1,8 +1,7 @@
 package com.hmdp.config;
 
-
-import com.hmdp.utils.LoginInterceptor;
-import com.hmdp.utils.RefreshTokenInterceptor;
+import com.hmdp.interceptor.LoginInterceptor;
+import com.hmdp.interceptor.RefreshTokenInterceptor;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.context.annotation.Configuration;
@@ -37,7 +36,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         , "/voucher/**"
                 )
                 .order(1);
-        // Token续命拦截器
+        //Token续命拦截器
         registry
                 .addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
                 .addPathPatterns("/**")
