@@ -9,10 +9,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import javax.annotation.Resource;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 
@@ -78,6 +83,27 @@ class HmDianPingApplicationTests {
     @Test
     public void testHyperLogLog(){
         stringRedisTemplate.opsForHyperLogLog().add("uv", "1");
+    }
+
+    @Test
+    public void testStream(){
+        // 从集合创建
+        List<String> list = Arrays.asList("1", "2", "3", "12312");
+        Stream<String> stream1 = list.stream();
+
+        List<String> collect = list.stream().filter(x -> x.startsWith("1")).collect(Collectors.toList());
+        collect.forEach(x -> System.out.println(x));
+
+
+        // 从数组创建
+        String[] array = {"a", "b", "c"};
+        Stream<String> stream2 = Arrays.stream(array);
+
+        // 直接创建
+        Stream<String> stream3 = Stream.of("a", "b", "c");
+
+        // 创建无限流
+        Stream<Integer> infiniteStream = Stream.iterate(0, n -> n + 2);
     }
 
 }

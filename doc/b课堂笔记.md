@@ -46,4 +46,31 @@ public Result likeBlogYan(Long id) {
 ```
 
 # 点赞排行榜
-
+**stream 流的使用要熟练**
+**zset 没有根据 field 判断是否存在数据 **
+```java
+// 查询排行榜 top5
+@Override
+public Result queryBlogLikesById(Long id) {
+    String key = RedisConstants.BLOG_LIKED_KEY + id;
+    //查询top5的点赞用户
+    Set<String> top5 = stringRedisTemplate.opsForZSet().range(key, 0, 4);
+    if (top5 == null || top5.isEmpty()){
+        return Result.ok(Collections.emptyList());
+    }
+    // 2、解析出用户id
+    List<Long> userIds = top5.stream().map(Long::valueOf).collect(Collectors.toList());
+    // 写出 SQL 语句
+    String join = StrUtil.join(",", userIds);       //  "5, 1, 4"
+    //根据id查询用户  where id in (5, 1, 4) order by filed(id, 5, 1, 4)
+    List<UserDTO> userDTOS = userService.lambdaQuery()
+            .in(User::getId,userIds)
+            .last("order by field(id,"+join+")")
+            .list()
+            .stream().map(user ->
+                    BeanUtil.copyProperties(user, UserDTO.class)
+            ).collect(Collectors.toList());
+    //返回
+    return Result.ok(userDTOS);
+}
+```

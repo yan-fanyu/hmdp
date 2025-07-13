@@ -19,17 +19,30 @@ import javax.annotation.Resource;
 @RestController
 @RequestMapping("/follow")
 public class FollowController {
+//    @Resource
+//    private IFollowService followService;
+//
+//    @PutMapping("/{id}/{isFollow}")
+//    public Result follow(@PathVariable("id") Long followUserId, @PathVariable("isFollow")Boolean isFollow){
+//        return followService.follow(followUserId, isFollow);
+//    }
+//
+//    @GetMapping("/or/not/{id}")
+//    public Result follow(@PathVariable("id") Long followUserId){
+//        return followService.isFollow(followUserId);
+//    }
+
     @Resource
     private IFollowService followService;
 
     @PutMapping("/{id}/{isFollow}")
-    public Result follow(@PathVariable("id") Long followUserId, @PathVariable("isFollow")Boolean isFollow){
+    public Result follow(@PathVariable("id") Long followUserId, @PathVariable("isFollow") Boolean isFollow){
         return followService.follow(followUserId, isFollow);
     }
 
     @GetMapping("/or/not/{id}")
-    public Result follow(@PathVariable("id") Long followUserId){
-        return followService.isFollow(followUserId);
+    public Result isFollow(@PathVariable("id") Long id){
+        return followService.isFollow(id);
     }
 
     @GetMapping("/common/{id}")

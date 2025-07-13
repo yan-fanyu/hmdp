@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.hmdp.utils.RedisConstants.FOLLOW_KEY;
+
 /**
  * <p>
  *  服务实现类
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
  */
 @Service
 public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> implements IFollowService {
+
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -41,7 +44,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         // 1 获取登录用户
         Long userId = UserHolder.getUser().getId();
 
-        String key = "follows:" + userId;
+        String key = FOLLOW_KEY + userId;
         // 1 判断是关注还是取关
         if(isFollow){
             // 2 关注 新增数据
@@ -66,29 +69,58 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         return Result.ok();
     }
 
+//    @Override
+//    public Result isFollow(Long followUserId) {
+//        Long id = UserHolder.getUser().getId();
+//        Integer count = query().eq("user_id", id).eq("follow_user_id", followUserId).count();
+//        return Result.ok(count > 0);
+//    }
+
     @Override
     public Result isFollow(Long followUserId) {
-        // 1 获取登录用户
         Long userId = UserHolder.getUser().getId();
-        // 2 查询是否关注 select count(*) tb_follow where user_id = ? and follow_user_id = ?
         Integer count = query().eq("user_id", userId).eq("follow_user_id", followUserId).count();
         return Result.ok(count > 0);
     }
+
+//    @Override
+//    public Result isFollow(Long followUserId) {
+//        // 1 获取登录用户
+//        Long userId = UserHolder.getUser().getId();
+//        // 2 查询是否关注 select count(*) tb_follow where user_id = ? and follow_user_id = ?
+//        Integer count = query().eq("user_id", userId).eq("follow_user_id", followUserId).count();
+//        return Result.ok(count > 0);
+//    }
 
     @Override
     public Result followCommons(Long id) {
         // 1 获取当前用户
         Long userId = UserHolder.getUser().getId();
-        String key = "follows:" + userId;
+        String key = FOLLOW_KEY + userId;
 
         // 2 求交集
-        String key2 = "follows:" + id;
+        String key2 = FOLLOW_KEY + id;
         Set<String> intersect = stringRedisTemplate.opsForSet().intersect(key, key2);
 
         if(intersect == null || intersect.isEmpty()){
             // 无交集
             return Result.ok(Collections.emptyList());
         }
+
+        // todo: 面试 哪里用了 stream 流
+        /*
+        回答：
+        比如在判断用户共同关注时候，首先获取到当前登录的用户id，然后获取到另一个用户的id
+        在获取到这两个用户id 以后，先通过redis 调用 intersect 方法查找 两个用户关注列表的交集
+        得到 Set<String> ids类型
+        然后通过 ids.stream().map(Long::valueOf).collect(Collectors.toList())  得到共同关注好友的 id list
+
+        然后再次利用stream 流
+        先通过 mapper 访问数据库得到所有的用户 user
+        调用 stream() 方法 然后 map 将 user 转化为 userDTO 转化为前端所需的数据
+
+        最后 把 UserDTO 集合返回给前端
+         */
 
         // 3 解析 id 集合
         List<Long> ids = intersect.stream().map(Long::valueOf).collect(Collectors.toList());

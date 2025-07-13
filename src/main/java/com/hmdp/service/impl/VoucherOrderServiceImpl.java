@@ -72,30 +72,30 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         String queueName = "stream.orders";
         @Override
         public void run() {
-            while (true) {
-                try {
-                    // 1 获取订单中的信息
-                    List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
-                            Consumer.from("g1", "c1"),
-                            StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
-                            StreamOffset.create(queueName, ReadOffset.lastConsumed())
-                    );
-                    if(list == null || list.isEmpty()){
-                        continue;
-                    }
-                    // 3 解析消息
-                    MapRecord<String, Object, Object> record = list.get(0);
-                    Map<Object, Object> values = record.getValue();
-                    VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
-                    // 4 获取成功 可以下单
-                    handleVoucherOrder(voucherOrder);
-                    // ACK 确认 消息
-                    stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
-                } catch (Exception e) {
-                    log.error("处理订单异常", e);
-                    handelPendingList();
-                }
-            }
+//            while (true) {
+//                try {
+//                    // 1 获取订单中的信息
+//                    List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
+//                            Consumer.from("g1", "c1"),
+//                            StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+//                            StreamOffset.create(queueName, ReadOffset.lastConsumed())
+//                    );
+//                    if(list == null || list.isEmpty()){
+//                        continue;
+//                    }
+//                    // 3 解析消息
+//                    MapRecord<String, Object, Object> record = list.get(0);
+//                    Map<Object, Object> values = record.getValue();
+//                    VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
+//                    // 4 获取成功 可以下单
+//                    handleVoucherOrder(voucherOrder);
+//                    // ACK 确认 消息
+//                    stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
+//                } catch (Exception e) {
+//                    log.error("处理订单异常", e);
+//                    handelPendingList();
+//                }
+//            }
         }
 
         private void handelPendingList() {
