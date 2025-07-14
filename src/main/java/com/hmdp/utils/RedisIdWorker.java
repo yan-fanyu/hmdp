@@ -10,6 +10,22 @@ import java.time.format.DateTimeFormatter;
 
 @Component
 public class RedisIdWorker {
+    // todo 面试 生成全局唯一id
+    /*
+    采用64 bit 的 long 作为全局唯一id
+    第一位为 符号位 0
+    然后31位 为时间戳
+    最后32bit 为自增长的序列号 表示当天的数据量
+    使用 redis 实现全局性
+    long count = stringRedisTemplate.opsForValue()
+                    .increment("icr:" + keyPrefix + ":" + date);
+    redis 中的 key 设计为 "icr:" + keyPrefix + ":" + date
+
+    即每天一个 redis key
+
+
+     */
+
 
     private static final long BEGIN_TIMESTAMP = 1640995200L;
     private static final int COUNT_BITS = 32;
@@ -35,7 +51,7 @@ public class RedisIdWorker {
 
 
         // 3 拼接并返回
-        return timestamp << 32 | count;
+        return timestamp << COUNT_BITS | count;
     }
 
     public static void main(String[] args) {
