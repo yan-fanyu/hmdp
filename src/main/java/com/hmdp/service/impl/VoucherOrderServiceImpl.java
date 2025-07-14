@@ -165,9 +165,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         SECKILL_SCRIPT.setResultType(Long.class);
     }
 
-    // CAS 实现秒杀
+    // 第二版 使用 stock 字段 实现 CAS 乐观锁 实现秒杀库存超卖问题
     @Override
-    public Result seckillVoucherCAS(Long voucherId) {
+    public Result seckillVoucher(Long voucherId) {
         // 1 获取优惠券
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
         // 2 判断秒杀是否开始
@@ -192,9 +192,19 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         // 6 创建订单
+        VoucherOrder voucherOrder = new VoucherOrder();
+        // 2 订单 id
+        long orderId = redisIdWorker.nextId("order");
+        voucherOrder.setId(orderId);
+        // 3 用户 id
+        Long userId = UserHolder.getUser().getId();
+        voucherOrder.setUserId(userId);
+        // 4 代金券 id
+        voucherOrder.setVoucherId(voucherId);
+        // 5 持久化到数据库
+        save(voucherOrder);
 
-
-        return Result.ok();
+        return Result.ok(orderId);
     }
 
 //    @Override
@@ -294,49 +304,49 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //
 //    }
 
-    // 第一版 不加锁
-    @Override
-    @Transactional
-    public Result seckillVoucher(Long voucherId) {
-        // 1 查询优惠券
-        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
-        // 2 判断秒杀是否开始
-        if(voucher.getBeginTime().isAfter(LocalDateTime.now())){
-            return Result.fail("秒杀尚未开始");
-        }
-        // 3 判断秒杀是否已经结束
-        if(voucher.getEndTime().isBefore(LocalDateTime.now())){
-            return Result.fail("秒杀已经结束");
-        }
-        // 4 判断库存是否充足
-        if(voucher.getStock() < 1){
-            return Result.fail("库存不足");
-        }
-
-
-
-        boolean success = seckillVoucherService.update().
-                setSql("stock = stock - 1")
-                .eq("voucher_id", voucherId).update();
-
-        if (!success) {
-            return Result.fail("库存不足");
-        }
-        // 1 创建订单
-        VoucherOrder voucherOrder = new VoucherOrder();
-        // 2 订单 id
-        long orderId = redisIdWorker.nextId("order");
-        voucherOrder.setId(orderId);
-        // 3 用户 id
-        Long userId = UserHolder.getUser().getId();
-        voucherOrder.setUserId(userId);
-        // 4 代金券 id
-        voucherOrder.setVoucherId(voucherId);
-        // 5 持久化到数据库
-        save(voucherOrder);
-
-        return Result.ok(orderId);
-    }
+//    // 第一版 不加锁
+//    @Override
+//    @Transactional
+//    public Result seckillVoucher(Long voucherId) {
+//        // 1 查询优惠券
+//        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+//        // 2 判断秒杀是否开始
+//        if(voucher.getBeginTime().isAfter(LocalDateTime.now())){
+//            return Result.fail("秒杀尚未开始");
+//        }
+//        // 3 判断秒杀是否已经结束
+//        if(voucher.getEndTime().isBefore(LocalDateTime.now())){
+//            return Result.fail("秒杀已经结束");
+//        }
+//        // 4 判断库存是否充足
+//        if(voucher.getStock() < 1){
+//            return Result.fail("库存不足");
+//        }
+//
+//
+//
+//        boolean success = seckillVoucherService.update().
+//                setSql("stock = stock - 1")
+//                .eq("voucher_id", voucherId).update();
+//
+//        if (!success) {
+//            return Result.fail("库存不足");
+//        }
+//        // 1 创建订单
+//        VoucherOrder voucherOrder = new VoucherOrder();
+//        // 2 订单 id
+//        long orderId = redisIdWorker.nextId("order");
+//        voucherOrder.setId(orderId);
+//        // 3 用户 id
+//        Long userId = UserHolder.getUser().getId();
+//        voucherOrder.setUserId(userId);
+//        // 4 代金券 id
+//        voucherOrder.setVoucherId(voucherId);
+//        // 5 持久化到数据库
+//        save(voucherOrder);
+//
+//        return Result.ok(orderId);
+//    }
 
 
     @Transactional
