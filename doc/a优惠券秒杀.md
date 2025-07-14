@@ -134,3 +134,16 @@ boolean success = seckillVoucherService.update()
         return Result.ok(orderId);
     }
 ```
+
+# 第五版 在分布式场景下  基于 Redis 实现分布式锁
+Synchronized 是锁不住 多台服务的多台JVM的
+相同的一个用户在多台机器上登录
+
+所以引入 redis 分布式锁
+
+
+必须保证 设置锁 + 设置锁过期时间 为原子操作
+
+```redis
+set lock thread1 nx ex 10
+```
