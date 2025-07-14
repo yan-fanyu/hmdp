@@ -361,3 +361,138 @@ public class SimpleRedisLock implements ILock{
 # Redisson 快速入门 -> 之前学的可以不用
 
 使用 Redisson 的锁 替换 自己实现的分布式锁
+
+```java
+// 第六版 利用 Redisson 实现 分布式锁 解决分布式下 一人一单问题
+@Override
+public Result seckillVoucher(Long voucherId) {
+    // 1 获取优惠券
+    SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+    // 2 判断秒杀是否开始
+    if(voucher.getBeginTime().isAfter(LocalDateTime.now())){
+        return Result.fail("秒杀尚未开始");
+    }
+    // 3 判断秒杀是否结束
+    if(voucher.getEndTime().isBefore(LocalDateTime.now())){
+        return Result.fail("秒杀已经结束");
+    }
+    // 4 判断库存是否充足
+    if (voucher.getStock() < 1) {
+        return Result.fail("库存不足");
+    }
+
+
+    Long userId = UserHolder.getUser().getId();
+    // 使用 Redisson 分布式锁
+    RLock lock = redissonClient.getLock("lock:redisson:order:" + userId);
+    // 使用无参方法  只尝试获取一次锁  失败即返回
+    boolean isLock = lock.tryLock();
+    if (!isLock) {
+        return Result.fail("不允许重复下单");
+    }
+    try {
+        IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+        return proxy.createVoucherOrder(voucherId);
+    }finally {
+        lock.unlock();
+    }
+
+}
+```
+
+
+# Redisson原理01 分布式锁可重入的底层原理
+![img_84.png](img_84.png)
+使用 hash 结构 存储线程标识 + 重入次数
+
+底层原理 ： hash结构 + lua 脚本
+
+当重入次数为 0 
+其他线程可以获得锁
+![img_85.png](img_85.png)
+
+redisson tryLock() 方法源码
+![img_86.png](img_86.png)
+
+redisson unlock() 方法源码
+![img_87.png](img_87.png)
+
+![img_88.png](img_88.png)
+
+# Redisson原理02 分布式锁可重试的底层原理
+
+在 10 秒中获取不到锁 会一直重试
+```java
+    Long userId = UserHolder.getUser().getId();
+    // 使用 Redisson 分布式锁
+    RLock lock = redissonClient.getLock("lock:redisson:order:" + userId);
+    // 使用无参方法  只尝试获取一次锁  失败即返回
+    boolean isLock = lock.tryLock(10L, TimeUnit.SECONDS);
+    if (!isLock) {
+        return Result.fail("不允许重复下单");
+    }
+    try {
+        IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+        return proxy.createVoucherOrder(voucherId);
+    }finally {
+        lock.unlock();
+    }
+```
+
+原理：自己看源代码
+大概：Future 返回 ttl，然后判断ttl的时间，是否还足够进行一次重试，
+然后等待一会，再次重试   （发布订阅模式）
+
+# Redisson原理03 分布式锁超时释放+自动续期的底层原理
+
+看门狗机制：30秒 每次加 10 秒
+
+![img_89.png](img_89.png)
+
+![img_90.png](img_90.png)
+
+
+# Redisson原理04 分布式锁主从一致底层原理
+多个独立的Redis节点
+必须获取每一个主节点的 lock 才算获取锁成功
+
+而每个锁也支持可重入特性
+
+名词： 连锁
+可以只使用多个主节点间，可以为每个主节点配置多个从节点
+![img_93.png](img_93.png)
+
+
+![img_92.png](img_92.png)
+
+
+
+# 秒杀优化
+
+优化策略
+在 Redis 中 实现库存校验 和 一人一单的校验 
+然后开启独立线程处理其他业务
+
+就比如很多人要去吃饭，可以优先让客户去抢号，抢到号码后，然后再去进行做饭等耗时的操作
+而不是为每个客户都先去做饭，并且同步判断是否超卖
+![img_95.png](img_95.png)
+
+![img_94.png](img_94.png)
+
+
+
+# 秒杀优化需求分析
+仅判断是否有秒杀资格
+有 返回 0 -> 生成订单、下单、扣库存 等一些列操作
+无 返回 1 2 -> 直接返回
+
+开启独立线程写入数据库
+![img_97.png](img_97.png)
+
+![img_98.png](img_98.png)
+
+# 秒杀优化具体实现
+
+
+
+
