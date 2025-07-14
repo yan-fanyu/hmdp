@@ -107,7 +107,7 @@
             <collectionProp name="HeaderManager.headers">
               <elementProp name="" elementType="Header">
                 <stringProp name="Header.name">authorization</stringProp>
-                <stringProp name="Header.value">509f37db59dc435c9cfab75f04e50643</stringProp>
+                <stringProp name="Header.value">b453f4ec90a04c0ebf93bee88cb30906</stringProp>
               </elementProp>
             </collectionProp>
           </HeaderManager>
@@ -197,7 +197,7 @@
           <hashTree/>
         </hashTree>
       </hashTree>
-      <SetupThreadGroup guiclass="SetupThreadGroupGui" testclass="SetupThreadGroup" testname="秒杀抢购多人">
+      <SetupThreadGroup guiclass="SetupThreadGroupGui" testclass="SetupThreadGroup" testname="秒杀抢购多人" enabled="true">
         <intProp name="ThreadGroup.num_threads">1000</intProp>
         <intProp name="ThreadGroup.ramp_time">0</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">false</boolProp>
