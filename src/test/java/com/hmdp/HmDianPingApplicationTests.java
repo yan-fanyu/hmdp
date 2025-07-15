@@ -5,6 +5,7 @@ import com.hmdp.service.impl.ShopServiceImpl;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisIdWorker;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -36,6 +37,14 @@ class HmDianPingApplicationTests {
     RedisIdWorker redisIdWorker;
 
     private ExecutorService es = Executors.newFixedThreadPool(500);
+
+    @Resource
+    RabbitTemplate rabbitTemplate;
+    @Test
+    public void testSendMessage(){
+        rabbitTemplate.convertAndSend("hmdianping.direct","direct.seckill","测试发送消息");
+    }
+
 
     @Test
     void testIdWorker() throws InterruptedException {

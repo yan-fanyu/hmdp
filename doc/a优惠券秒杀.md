@@ -492,7 +492,207 @@ redisson unlock() 方法源码
 ![img_98.png](img_98.png)
 
 # 秒杀优化具体实现
+阻塞队列实现
+问题：JVM内存占用过多
+数据安全问题
+
+```java
+package com.hmdp.service.impl;
+
+import cn.hutool.core.bean.BeanUtil;
+import com.hmdp.dto.Result;
+import com.hmdp.entity.SeckillVoucher;
+import com.hmdp.entity.VoucherOrder;
+import com.hmdp.mapper.VoucherOrderMapper;
+import com.hmdp.service.ISeckillVoucherService;
+import com.hmdp.service.IVoucherOrderService;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.SimpleRedisLock;
+import com.hmdp.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.aop.framework.AopContext;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.stream.*;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.*;
+
+import static com.hmdp.utils.RedisConstants.LOCK_ORDER_KEY;
+
+/**
+ * <p>
+ *  服务实现类
+ * </p>
+ *
+ * @author 虎哥
+ * @since 2021-12-22
+ */
+@Service
+@Slf4j
+public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
+
+    @Resource
+    private ISeckillVoucherService seckillVoucherService;
+
+    // 注入 全局唯一 id 生成器
+    // 可以传入参数 prefix 作为不同业务的 全局唯一 id生成器
+    // 此处主要用于生成 全局唯一 优惠券订单id
+    @Resource
+    private RedisIdWorker redisIdWorker;
+
+    @Resource
+    StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    RedissonClient redissonClient;
+
+    // 获取代理对象
+    private IVoucherOrderService proxy;
 
 
+    // 加载 lua 脚本
+    private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
+    static {
+        SECKILL_SCRIPT = new DefaultRedisScript<>();
+        SECKILL_SCRIPT.setLocation(new ClassPathResource("seckill.lua"));
+        SECKILL_SCRIPT.setResultType(Long.class);
+    }
+
+    // 下面两行代码 -> 阻塞队列 + 线程池 在 seckillVoucher 判断用户具有秒杀资格后 异步处理下单的剩余操作
+    // 保存异步下单任务到阻塞队列
+    private BlockingQueue<VoucherOrder> orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
+    // 创建线程池 创建订单、下单 并持久化到数据库
+    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    @PostConstruct
+    private void init(){
+        SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
+    }
+
+    private class VoucherOrderHandler implements Runnable{
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    // 1 从队列获取一个订单信息
+                    VoucherOrder voucherOrder = orderTasks.take();
+                    // 2 创建订单
+                    handleVoucherOrder(voucherOrder);
+                } catch (Exception e) {
+                    log.error("处理订单异常", e);
+                }
+            }
+        }
+
+
+    }
+
+    private void handleVoucherOrder(VoucherOrder voucherOrder) {
+        // 1 获取用户
+        Long userId = voucherOrder.getUserId();
+        // 2 创建锁对象
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        // 3 获取锁
+        // 使用无参方法 失败直接返回
+        boolean isLock = lock.tryLock();
+        // 4 判断锁是否成功
+        if(!isLock){
+            // 获取锁失败 返回错误或者重试
+            log.error("不允许重复下单");
+            return;
+        }try {
+            // 创建订单 更新库存 保存订单到数据库
+            proxy.createVoucherOrder(voucherOrder);
+        }finally {
+            // 释放锁
+            lock.unlock();
+        }
+    }
+
+    // 第七版 使用 Lua 脚本 异步下单优化  在redis实现 库存判断 + 一人一单
+    // 终极方案
+    @Override
+    public Result seckillVoucher(Long voucherId) {
+        // 获取用户
+        Long userId = UserHolder.getUser().getId();
+        // 1 执行 lua 脚本
+        Long result = stringRedisTemplate.execute(
+                SECKILL_SCRIPT,
+                Collections.emptyList(),
+                voucherId.toString(), userId.toString()
+        );
+        // 判断结果是否是 0
+        int r = result.intValue();
+        if(r != 0){
+            // 不是0 代表没有购买资格
+            return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+        }
+        // 2.2 为 0 有购买资格  把下单信息保存到阻塞队列
+        VoucherOrder voucherOrder = new VoucherOrder();
+        // 2.3 订单 id
+        long orderId = redisIdWorker.nextId("order");
+        voucherOrder.setId(orderId);
+        // 2.4 用户 id
+        voucherOrder.setUserId(userId);
+        // 2.5 代金券id
+        voucherOrder.setVoucherId(voucherId);
+        // 2.6 放入阻塞队列
+        orderTasks.add(voucherOrder);
+
+        // 3 获取代理对象  初始化成员变量proxy
+        proxy = (IVoucherOrderService) AopContext.currentProxy();
+
+        // 4 返回订单 id
+        return Result.ok(orderId);
+    }
+    // 秒杀优化
+    @Transactional
+    public void createVoucherOrder(VoucherOrder voucherOrder) {
+        // 5 一人一单
+        Long userId = voucherOrder.getUserId();
+        Long voucherId = voucherOrder.getVoucherId();
+
+
+        int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        if (count > 0) {
+            // 用户已经购买过了
+            log.error("用户已经购买过一次");
+            return;
+        }
+
+        // 6 扣减库存
+        boolean success = seckillVoucherService.update()
+                .setSql("stock = stock - 1")
+                .eq("voucher_id", voucherId).gt("stock", 0)
+                .update();
+        if (!success) {
+            log.error("库存不足");
+            return;
+        }
+
+        save(voucherOrder);
+    }
+}
+
+```
+
+使用Java内存实现阻塞队列的存在的问题
+![img_99.png](img_99.png)
+
+jvm内存没有持久化机制
 
 
