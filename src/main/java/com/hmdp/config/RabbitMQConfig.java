@@ -23,14 +23,7 @@ public class RabbitMQConfig {
     @Resource
     IVoucherOrderService voucherOrderService;
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = "direct.seckill.queue"),
-            key = "direct.seckill",
-            exchange = @Exchange(name = "hmdianping.direct", type = ExchangeTypes.DIRECT)
-    ))
-    public void recieveMessage(Object message){
-        System.out.println("监听到了"+message);
-    }
+
 
 
     @Bean
