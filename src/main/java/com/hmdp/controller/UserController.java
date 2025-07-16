@@ -55,6 +55,20 @@ public class UserController {
     }
 
     /**
+     * 登录功能
+     * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
+     */
+    @PostMapping("/register")
+    public Result register(@RequestBody LoginFormDTO loginForm, HttpSession session){
+        String phone = loginForm.getPhone();
+        if(phone == null){
+            return Result.fail("手机号为空！");
+        }
+        return userService.register(loginForm, session);
+    }
+
+
+    /**
      * 登出功能
      * @return 无
      */

@@ -71,6 +71,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     RedissonClient redissonClient;
 
+    @Resource
+    private IVoucherOrderService voucherOrderService; // 自注入代理对象
+
 
     // 加载 lua 脚本
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
@@ -93,8 +96,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             // 2.不为0说明没有购买资格
             return Result.fail(result == 1 ? "库存不足" : "不能重复下单");
         }
-        // 3 获取代理对象  初始化成员变量proxy
-        proxy = (IVoucherOrderService) AopContext.currentProxy();
 
         // 4.走到这一步说明有购买资格，将订单信息存到消息队列
         VoucherOrder voucherOrder = new VoucherOrder();
@@ -107,7 +108,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         return Result.ok(orderId);
     }
 
-    @Scheduled(fixedRate = 5000) // 每5秒执行一次
+//    @Scheduled(fixedRate = 1)
     public void scheduledThreadPoolMonitor() {
         int activeCount = orderProcessingExecutor.getActiveCount();
         int maxPoolSize = orderProcessingExecutor.getMaximumPoolSize();
@@ -119,13 +120,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 maxPoolSize);
     }
 
-    // 获取代理对象
-    private IVoucherOrderService proxy;
 
-    // 在类中添加线程池配置
-    // private final ExecutorService orderProcessingExecutor = Executors.newFixedThreadPool(10);
+
     private final ThreadPoolExecutor orderProcessingExecutor =
-            (ThreadPoolExecutor) Executors.newFixedThreadPool(10);
+            (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
 
 
     @RabbitListener(bindings = @QueueBinding(
@@ -134,6 +132,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             exchange = @Exchange(name = "hmdianping.direct", type = ExchangeTypes.DIRECT)
     ))
     public void listenOrderCreate(VoucherOrder voucherOrder) {
+        scheduledThreadPoolMonitor();
         orderProcessingExecutor.submit(() -> {
             try {
                 handleVoucherOrder(voucherOrder);
@@ -164,7 +163,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         try {
             // 创建订单 更新库存 保存订单到数据库
-            proxy.createVoucherOrder(voucherOrder);
+            voucherOrderService.createVoucherOrder(voucherOrder);
         } finally {
             // 释放锁
             lock.unlock();

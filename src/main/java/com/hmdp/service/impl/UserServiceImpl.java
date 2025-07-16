@@ -109,6 +109,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok(token);
     }
 
+
     @Override
     public Result sign() {
         //获取当前登陆用户
@@ -171,7 +172,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok(count);
     }
 
-    private User createUserWithPhone(String phone) {
+    @Override
+    public User createUserWithPhone(String phone) {
         User user = new User();
         user.setPhone(phone);
         //生成随机昵称
@@ -179,4 +181,46 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         baseMapper.insert(user);
         return user;
     }
+
+    @Override
+    public Result register(LoginFormDTO loginForm, HttpSession session) {
+        // 1.校验手机号
+        String phone = loginForm.getPhone();
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            // 2.如果不符合，返回错误信息
+            return Result.fail("手机号格式错误！");
+        }
+
+
+
+
+        //一致，根据手机号查询用户
+        User user = query().eq("phone", phone).one();
+
+        //5.判断用户是否存在
+        if(user == null){
+            //不存在，则创建
+            user =  createUserWithPhone(phone);
+        }
+
+        // 7.保存用户信息到 redis中
+        // 7.1.随机生成token，作为登录令牌
+        String token = UUID.randomUUID().toString(true);
+        // 7.2.将User对象转为HashMap存储
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(), //beanToMap方法执行了对象到Map的转换
+                CopyOptions.create()
+                        .setIgnoreNullValue(true) //BeanUtil在转换过程中忽略所有null值的属性
+                        .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString())); //对于每个字段值，它简单地调用toString()方法，将字段值转换为字符串。
+        // 7.3.存储
+        String tokenKey = LOGIN_USER_KEY + token;
+        stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
+        // 7.4.设置token有效期
+        stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
+
+        // 8.返回token
+        return Result.ok(token);
+
+    }
+
 }
