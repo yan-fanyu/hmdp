@@ -25,10 +25,12 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -91,7 +93,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             // 2.不为0说明没有购买资格
             return Result.fail(result == 1 ? "库存不足" : "不能重复下单");
         }
-        // 3.走到这一步说明有购买资格，将订单信息存到消息队列
+        // 3 获取代理对象  初始化成员变量proxy
+        proxy = (IVoucherOrderService) AopContext.currentProxy();
+
+        // 4.走到这一步说明有购买资格，将订单信息存到消息队列
         VoucherOrder voucherOrder = new VoucherOrder();
         long orderId = redisIdWorker.nextId("order");
         voucherOrder.setId(orderId);
@@ -102,27 +107,46 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         return Result.ok(orderId);
     }
 
+    @Scheduled(fixedRate = 5000) // 每5秒执行一次
+    public void scheduledThreadPoolMonitor() {
+        int activeCount = orderProcessingExecutor.getActiveCount();
+        int maxPoolSize = orderProcessingExecutor.getMaximumPoolSize();
+        double utilization = (double) activeCount / maxPoolSize;
+
+        log.info("[线程池监控] 使用率: {}% 活跃线程: {}/{}",
+                String.format("%.2f", utilization * 100),
+                activeCount,
+                maxPoolSize);
+    }
+
+    // 获取代理对象
+    private IVoucherOrderService proxy;
+
+    // 在类中添加线程池配置
+    // private final ExecutorService orderProcessingExecutor = Executors.newFixedThreadPool(10);
+    private final ThreadPoolExecutor orderProcessingExecutor =
+            (ThreadPoolExecutor) Executors.newFixedThreadPool(10);
 
 
-//    public void recieveMessage(Object message){
-//        System.out.println("监听到了"+message);
-//    }
-
-    // 创建订单消费者
     @RabbitListener(bindings = @QueueBinding(
-        value = @Queue(name = "direct.seckill.queue"),
-        key = "direct.seckill",
-        exchange = @Exchange(name = "hmdianping.direct", type = ExchangeTypes.DIRECT)
+            value = @Queue(name = "direct.seckill.queue"),
+            key = "direct.seckill",
+            exchange = @Exchange(name = "hmdianping.direct", type = ExchangeTypes.DIRECT)
     ))
     public void listenOrderCreate(VoucherOrder voucherOrder) {
-        try {
-            System.out.println("消费者异步创建订单");
-            // 处理订单创建
-            handleVoucherOrder(voucherOrder);
-        } catch (Exception e) {
-            log.error("处理订单异常", e);
-            // 可以添加重试逻辑或错误处理
-        }
+        orderProcessingExecutor.submit(() -> {
+            try {
+                handleVoucherOrder(voucherOrder);
+            } catch (Exception e) {
+                log.error("处理订单异常", e);
+            }
+        });
+    }
+
+    // 添加销毁方法
+    @PreDestroy
+    public void destroy() {
+        orderProcessingExecutor.shutdown();
     }
 
     private void handleVoucherOrder(VoucherOrder voucherOrder) {
@@ -139,8 +163,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return;
         }
         try {
-            // 获取代理对象
-            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             // 创建订单 更新库存 保存订单到数据库
             proxy.createVoucherOrder(voucherOrder);
         } finally {
