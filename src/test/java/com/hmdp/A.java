@@ -1,48 +1,38 @@
-package com.hmdp;
-
 import java.util.HashMap;
 import java.util.Map;
 
-class A {
-    public void q(){
-        int n = 100;
-        int l = n;
-        int[] arr = new int[n];
-        for (int i = 0; i < n; i++) {
-            arr[i] = i+1;
-        }
-        int j = 1;
-        while(true){
-            boolean f = false;
-            for (int i = 0; i < n; i++) {
-                if(arr[i] == 0){
-                    continue;
-                }
-                if(j % 3 == 0){
-                    arr[i] = 0;
-                    l--;
-                }
-                if(l == 1){
-                    f = true;
-                    break;
-                }
-                j++;
-            }
-            if(f){
-                break;
-            }
-
-
-        }
-        for(int i = 0; i < n; i++){
-            if(arr[i] != 0){
-                System.out.println(arr[i]);
-            }
-        }
+class Solution {
+    public int cn2(int x){
+        return x * (x - 1) / 2;
     }
-    public static void main(String[] args) {
+    public int countTrapezoids(int[][] points) {
+        int MOD = 1_000_000_007;
         Map<Integer, Integer> map = new HashMap<>();
+        int mmm = 0;
+        for(int[] p: points){
+            int x = p[0];
+            int y = p[1];
+            map.put(y, map.getOrDefault(y, 0) + 1);
+        }
+        long ans = 0;
+        
+        int[] arr = map.e
+                .filter(e ->  >= 2)
+                .mapToInt(Map.Entry::getKey)
+                .toArray();
+        int res = 0;
+        for (int i = 0; i < arr.length; ++i) {
+            int y1 = arr[i];
+            int m = yToXs.get(y1).size();
+            for (int j = i + 1; j < arr.length; ++j) {
+                int y2 = arr[j];
+                int n = yToXs.get(y2).size();
+                long cnt = (long) m * (m - 1) / 2 % MOD;
+                cnt = cnt * (n * (n - 1) / 2 % MOD) % MOD;
+                res = (res + (int) cnt) % MOD;
+            }
+        }
 
-
+        return res;
     }
-}
+}©leetcode

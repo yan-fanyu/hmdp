@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @MapperScan("com.hmdp.mapper")
 @SpringBootApplication
 @EnableRabbit
-@EnableScheduling  // 必须添加此注解
+@EnableScheduling
 public class HmDianPingApplication {
 
     public static void main(String[] args) {
