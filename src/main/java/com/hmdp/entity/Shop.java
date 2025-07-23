@@ -10,6 +10,7 @@ import lombok.experimental.Accessors;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.*;
 
 /**
  * <p>
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 @Accessors(chain = true)
 @TableName("tb_shop")
 public class Shop implements Serializable {
+
 
     private static final long serialVersionUID = 1L;
 

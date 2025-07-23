@@ -13,12 +13,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/**
- * 刷新令牌拦截器
- *
- * @author CHEN
- * @date 2022/10/07
- */
 public class RefreshTokenInterceptor implements HandlerInterceptor {
     private final StringRedisTemplate stringRedisTemplate;
 
